@@ -1,0 +1,22 @@
+{
+  "name": "@nventr.ai/nventr-agent",
+  "version": "1.0.8",
+  "description": "Core javascript for including nventr-agent in a web application.",
+  "main": "dist/nventr-agent.js",
+  "scripts": {
+    "build": "uglifyjs src/nventr-agent.js --compress --mangle --warn --output dist/nventr-agent.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hgmventures/nventr-agent-js.git"
+  },
+  "author": "Steven Swallow",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/hgmventures/nventr-agent-js/issues"
+  },
+  "homepage": "https://github.com/hgmventures/nventr-agent-js#readme",
+  "devDependencies": {
+    "uglify-js": "^3.19.3"
+  }
+}
