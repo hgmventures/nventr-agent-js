@@ -1,18 +1,18 @@
-# inventr-agent.js
+# nventr-agent.js
 
-This JavaScript module is responsible for managing the Inventr agent.
+This JavaScript module is responsible for managing the Nventr agent.
 
 ## Including the agent in your HTML
 
-To include the agent in your HTML, use a script tag. The script tag must have an `id` of "inventr-agent".
+To include the agent in your HTML, use a script tag. The script tag must have an `id` of "nventr-agent".
 
 Example:
 
 ```html
 <!-- Including the agent with an id -->
 <script
-  id="inventr-agent"
-  src="https://agent.inventr.ai/inventr-agent.js?id=yourid"
+  id="nventr-agent"
+  src="https://agent.inventr.ai/nventr-agent.js?id=yourid"
 ></script>
 ```
 
@@ -23,8 +23,8 @@ If you want to include the agent but not render it immediately, you can set the 
 ```html
 <!-- Including the agent with render=false and no id -->
 <script
-  id="inventr-agent"
-  src="https://agent.inventr.ai/inventr-agent.js?render=false"
+  id="nventr-agent"
+  src="https://agent.inventr.ai/nventr-agent.js?render=false"
 ></script>
 ```
 
@@ -32,29 +32,29 @@ Then, you can use JavaScript to render the agent with an `id` when needed:
 
 ```javascript
 // Render the agent with an id
-window.inventrAgent.render({
+window.nventrAgent.render({
   id: "yourid",
 });
 ```
 
 ### Waiting for the Agent Script to Load
 
-To ensure that the `window.inventrAgent` object is available before using it, you can wait for the script to load by listening to the `load` event of the script tag:
+To ensure that the `window.nventrAgent` object is available before using it, you can wait for the script to load by listening to the `load` event of the script tag:
 
 ```html
 <!-- Including the agent script -->
 <script
-  id="inventr-agent"
-  src="https://agent.inventr.ai/inventr-agent.js?id=yourid"
+  id="nventr-agent"
+  src="https://agent.inventr.ai/nventr-agent.js?id=yourid"
 ></script>
 
 <script>
   // Wait for the agent script to load
   document
-    .getElementById("inventr-agent")
+    .getElementById("nventr-agent")
     .addEventListener("load", function () {
-      // Now you can safely use window.inventrAgent
-      window.inventrAgent.render({
+      // Now you can safely use window.nventrAgent
+      window.nventrAgent.render({
         id: "yourid",
       });
     });
@@ -63,8 +63,8 @@ To ensure that the `window.inventrAgent` object is available before using it, yo
 
 #### Explanation
 
-- **Script Tag**: The script tag includes the agent script with an `id` of `inventr-agent`.
-- **Load Event Listener**: The `load` event listener waits for the script to fully load before using `window.inventrAgent`.
+- **Script Tag**: The script tag includes the agent script with an `id` of `nventr-agent`.
+- **Load Event Listener**: The `load` event listener waits for the script to fully load before using `window.nventrAgent`.
 - **Render Method**: The `render` method is called inside the `load` event listener to ensure that the agent is rendered only after the script is loaded.
 
 Sure, let's update the example to move the `render` call to the end and remove the `render: true` option.
@@ -88,24 +88,24 @@ To use the `@nventr.ai/nventr-agent` package in an ES6 JavaScript file, follow t
    Create a JavaScript file, e.g., `example.js`, and include the following code:
 
    ```javascript
-   // Import the inventrAgent from the @nventr.ai/nventr-agent package
-   import inventrAgent from "@nventr.ai/nventr-agent";
+   // Import the nventrAgent from the @nventr.ai/nventr-agent package
+   import nventrAgent from "@nventr.ai/nventr-agent";
 
    // Example of setting an action access token
-   inventrAgent.setActionsAccessToken(btoa(JSON.stringify({ userId: "1" })));
+   nventrAgent.setActionsAccessToken(btoa(JSON.stringify({ userId: "1" })));
 
    // Example of adding an action listener
-   inventrAgent.addActionListener("DELETE_WORKSPACE", (value) => {
+   nventrAgent.addActionListener("DELETE_WORKSPACE", (value) => {
      console.log("Workspace deleted:", value);
    });
 
    // Example of adding another action listener
-   inventrAgent.addActionListener("LIST_WORKSPACES", (workspaces) => {
+   nventrAgent.addActionListener("LIST_WORKSPACES", (workspaces) => {
      console.log("List of workspaces:", workspaces);
    });
 
    // Render the agent with your configuration
-   inventrAgent.render({
+   nventrAgent.render({
      id: "yourid", // Replace 'yourid' with your actual ID
    });
    ```
@@ -115,15 +115,15 @@ To use the `@nventr.ai/nventr-agent` package in an ES6 JavaScript file, follow t
 - **Importing the Module**:
 
   ```javascript
-  import inventrAgent from "@nventr.ai/nventr-agent";
+  import nventrAgent from "@nventr.ai/nventr-agent";
   ```
 
-  This line imports the `inventrAgent` from the `@nventr.ai/nventr-agent` package.
+  This line imports the `nventrAgent` from the `@nventr.ai/nventr-agent` package.
 
 - **Setting an Action Access Token**:
 
   ```javascript
-  inventrAgent.setActionsAccessToken(btoa(JSON.stringify({ userId: "1" })));
+  nventrAgent.setActionsAccessToken(btoa(JSON.stringify({ userId: "1" })));
   ```
 
   This sets an action access token using a base64-encoded JSON string containing the `userId`.
@@ -131,21 +131,21 @@ To use the `@nventr.ai/nventr-agent` package in an ES6 JavaScript file, follow t
 - **Adding Action Listeners**:
 
   ```javascript
-  inventrAgent.onAction((name, value) => {
+  nventrAgent.onAction((name, value) => {
     console.log("Handle action", name, value);
   });
 
-  inventrAgent.onActions((actions) => {
+  nventrAgent.onActions((actions) => {
     actions.forEach(({ name, value }) =>
       console.log("Check action", name, value)
     );
   });
 
-  inventrAgent.addActionListener("DELETE_WORKSPACE", (value) => {
+  nventrAgent.addActionListener("DELETE_WORKSPACE", (value) => {
     console.log("Workspace deleted:", value);
   });
 
-  inventrAgent.addActionListener("LIST_WORKSPACES", (workspaces) => {
+  nventrAgent.addActionListener("LIST_WORKSPACES", (workspaces) => {
     console.log("List of workspaces:", workspaces);
   });
   ```
@@ -154,19 +154,19 @@ To use the `@nventr.ai/nventr-agent` package in an ES6 JavaScript file, follow t
 
 - **Rendering the Agent**:
   ```javascript
-  inventrAgent.render({
+  nventrAgent.render({
     id: "yourid",
   });
   ```
-  This renders the `inventrAgent` with the specified configuration. Replace `'yourid'` with your actual ID.
+  This renders the `nventrAgent` with the specified configuration. Replace `'yourid'` with your actual ID.
 
 ### Summary
 
-By following this example, you can use the `inventrAgent` from the `@nventr.ai/nventr-agent` package in a standard JavaScript file. This approach allows you to set an action access token, add action listeners, and render the agent with the correct configuration.
+By following this example, you can use the `nventrAgent` from the `@nventr.ai/nventr-agent` package in a standard JavaScript file. This approach allows you to set an action access token, add action listeners, and render the agent with the correct configuration.
 
-## Using the inventrAgent in JavaScript
+## Using the nventrAgent in JavaScript
 
-The inventrAgent provides a set of methods that allow you to integrate and control the chatbot interface within your web application. This section describes how to use these methods to render the chatbot and handle action callbacks.
+The nventrAgent provides a set of methods that allow you to integrate and control the chatbot interface within your web application. This section describes how to use these methods to render the chatbot and handle action callbacks.
 
 ### Methods
 
@@ -182,7 +182,7 @@ Renders the chatbot interface. The `options` object can include:
 These options can also be passed as URL parameters when loading the agent:
 
 ```
-https://agent.inventr.ai/inventr-agent.js?id=yourid&fullscreen&collapse&dev&render=false
+https://agent.inventr.ai/nventr-agent.js?id=yourid&fullscreen&collapse&dev&render=false
 ```
 
 In this URL, `fullscreen`, `collapse`, and `dev` are valueless parameters, which are treated as `true`. The `render` parameter is set to `false`, so the chatbot does not render immediately.
@@ -190,7 +190,7 @@ In this URL, `fullscreen`, `collapse`, and `dev` are valueless parameters, which
 Example:
 
 ```javascript
-window.inventrAgent.render({
+window.nventrAgent.render({
   fullscreen: true,
   collapse: true,
   dev: true,
@@ -200,7 +200,7 @@ window.inventrAgent.render({
 
 ### setActionsAccessToken(token)
 
-Sets the action access token, which is used to authorize calls between the client and the agent based on the client's provided `actionsCallbackUrl`. The token should be something secure like a JWT so that authentication can be performed on the client server. The token is passed in the header `inventr-agent-actions-access-token` for `actionsCallbackUrl` requests.
+Sets the action access token, which is used to authorize calls between the client and the agent based on the client's provided `actionsCallbackUrl`. The token should be something secure like a JWT so that authentication can be performed on the client server. The token is passed in the header `nventr-agent-actions-access-token` for `actionsCallbackUrl` requests.
 
 #### Example Usage
 
@@ -208,7 +208,7 @@ Sets the action access token, which is used to authorize calls between the clien
 const exampleActionAccessToken = btoa(
   JSON.stringify({ userId: "1", clientId: "2" })
 );
-window.inventrAgent.setActionsAccessToken(exampleActionAccessToken);
+window.nventrAgent.setActionsAccessToken(exampleActionAccessToken);
 ```
 
 #### Parameters
@@ -227,7 +227,7 @@ Registers a callback function for a specific action. The callback is executed wh
 #### Example
 
 ```javascript
-window.inventrAgent.addActionListener('actionName', function(data) {
+window.nventrAgent.addActionListener('actionName', function(data) {
   console.log('Action received:', data);
 });
 ```
@@ -243,7 +243,7 @@ Registers a callback function for all actions. The callback is executed when any
 #### Example
 
 ```javascript
-window.inventrAgent.onAction((name, value) => {
+window.nventrAgent.onAction((name, value) => {
   console.log('Action received:', name, value);
 });
 ```
@@ -259,7 +259,7 @@ Registers a callback function for multiple actions. The callback is executed whe
 #### Example
 
 ```javascript
-window.inventrAgent.onActions((actions) => {
+window.nventrAgent.onActions((actions) => {
   actions.forEach(({ name, value }) => {
     console.log('Action received:', name, value);
   });
@@ -349,7 +349,7 @@ Restores the chatbot to its normal state from either fullscreen or collapsed sta
 Example:
 
 ```javascript
-window.inventrAgent.restore();
+window.nventrAgent.restore();
 ```
 
 ### collapse()
@@ -359,7 +359,7 @@ Collapses the chatbot to a minimized state.
 Example:
 
 ```javascript
-window.inventrAgent.collapse();
+window.nventrAgent.collapse();
 ```
 
 ### fullscreen()
@@ -369,7 +369,7 @@ Puts the chatbot into fullscreen mode.
 Example:
 
 ```javascript
-window.inventrAgent.fullscreen();
+window.nventrAgent.fullscreen();
 ```
 
 ### remove()
@@ -379,20 +379,20 @@ Removes the chatbot interface from the document.
 Example:
 
 ```javascript
-window.inventrAgent.remove();
+window.nventrAgent.remove();
 ```
 
 ## Action callbacks
 
-### How Action Callbacks Work with Inventr Agent
+### How Action Callbacks Work with Nventr Agent
 
-The Inventr Agent uses action callbacks to communicate with the web server and perform specific actions. The client provides an actionsCallbackUrl to the agent, which the agent calls to execute actions. The actions are authorized using a secure token, typically a JWT, which is supplied by the web app to the agent and passed in the header `Inventr-Agent-Action-Access-Token`.
+The Nventr Agent uses action callbacks to communicate with the web server and perform specific actions. The client provides an actionsCallbackUrl to the agent, which the agent calls to execute actions. The actions are authorized using a secure token, typically a JWT, which is supplied by the web app to the agent and passed in the header `Nventr-Agent-Action-Access-Token`.
 
-Action callbacks to the client's server from the Inventr Agent give the ability to use chat or natural voice to control data in the application. This is set up with the actionsCallbackUrl for the agent. An action access token (JWT, for example) can be set by the client's web application. Actions can be used to authorize and/or manipulate data. A listener can be added to the client web application (`addActionListener`) to perform validated actions on the web application.
+Action callbacks to the client's server from the Nventr Agent give the ability to use chat or natural voice to control data in the application. This is set up with the actionsCallbackUrl for the agent. An action access token (JWT, for example) can be set by the client's web application. Actions can be used to authorize and/or manipulate data. A listener can be added to the client web application (`addActionListener`) to perform validated actions on the web application.
 
 #### actionsCallbackUrl Express Example
 
-This example demonstrates how to set up an Express route to handle action callbacks from the Inventr Agent. The route listens for POST requests at the specified `actionsCallbackUrl` and performs various actions based on the request data.
+This example demonstrates how to set up an Express route to handle action callbacks from the Nventr Agent. The route listens for POST requests at the specified `actionsCallbackUrl` and performs various actions based on the request data.
 
 ### Example Code
 
@@ -408,7 +408,7 @@ app.use(express.json());
 app.use("/agent/actions", async (req, res) => {
   // Get the actionAccessToken from the request headers
   // The token is supplied by the web app to the agent
-  const actionAccessToken = req.headers["inventr-agent-actions-access-token"];
+  const actionAccessToken = req.headers["nventr-agent-actions-access-token"];
   const tokenVals = actionAccessToken ? decryptToken(actionAccessToken) : null;
   if (!tokenVals) return res.status(401).send("Invalid token");
 
@@ -511,11 +511,11 @@ app.listen(port, () => {
 
 ### Explanation
 
-1. **Route Setup**: The route `/agent/actions` is defined to handle POST requests. This is the `actionsCallbackUrl` that the Inventr Agent will call to perform actions.
+1. **Route Setup**: The route `/agent/actions` is defined to handle POST requests. This is the `actionsCallbackUrl` that the Nventr Agent will call to perform actions.
 
 2. **Token Extraction and Validation**:
 
-   - The `actionAccessToken` is extracted from the request headers using the header name `inventr-agent-actions-access-token`.
+   - The `actionAccessToken` is extracted from the request headers using the header name `nventr-agent-actions-access-token`.
    - The token is decrypted using the `decryptToken` function. If the token is invalid or missing, a `401 Unauthorized` response is sent.
 
 3. **Action Handling**:
@@ -539,7 +539,7 @@ app.listen(port, () => {
 
 ### Security
 
-- The `actionAccessToken` should be a secure token like a JWT, which is passed in the header `inventr-agent-actions-access-token`.
+- The `actionAccessToken` should be a secure token like a JWT, which is passed in the header `nventr-agent-actions-access-token`.
 - The token is used to authenticate and authorize the actions performed by the client on the server.
 
 This setup ensures that only authorized actions are performed and that the actions are securely authenticated using the provided token.
