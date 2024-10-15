@@ -50,14 +50,12 @@ To ensure that the `window.nventrAgent` object is available before using it, you
 
 <script>
   // Wait for the agent script to load
-  document
-    .getElementById("nventr-agent")
-    .addEventListener("load", function () {
-      // Now you can safely use window.nventrAgent
-      window.nventrAgent.render({
-        id: "yourid",
-      });
+  document.getElementById("nventr-agent").addEventListener("load", function () {
+    // Now you can safely use window.nventrAgent
+    window.nventrAgent.render({
+      id: "yourid",
     });
+  });
 </script>
 ```
 
@@ -66,12 +64,6 @@ To ensure that the `window.nventrAgent` object is available before using it, you
 - **Script Tag**: The script tag includes the agent script with an `id` of `nventr-agent`.
 - **Load Event Listener**: The `load` event listener waits for the script to fully load before using `window.nventrAgent`.
 - **Render Method**: The `render` method is called inside the `load` event listener to ensure that the agent is rendered only after the script is loaded.
-
-Sure, let's update the example to move the `render` call to the end and remove the `render: true` option.
-
-Example JavaScript File
-
-md%22%2C%22query%22%3A%22%22%2C%22fragment%22%3A%22%22%7D%2C%22pos%22%3A%7B%22line%22%3A41%2C%22character%22%3A109%7D%7D%5D%2C%22a9b1b750-f651-4065-8eee-c7a6ae1dbc75%22%5D "Go to definition") event listener to ensure that the agent is rendered only after the script is loaded.
 
 ## Including the Agent with NPM
 
@@ -200,15 +192,15 @@ window.nventrAgent.render({
 
 ### setActionsAccessToken(token)
 
-Sets the action access token, which is used to authorize calls between the client and the agent based on the client's provided `actionsCallbackUrl`. The token should be something secure like a JWT so that authentication can be performed on the client server. The token is passed in the header `nventr-agent-actions-access-token` for `actionsCallbackUrl` requests.
+Sets the webhook access token, which is used to authorize calls between the client and the agent based on the client's provided `webhookUrl`. The token should be something secure like a JWT so that authentication can be performed on the client server. The token is passed in the header `nventr-agent-webhook-access-token` for `webhookUrl` requests.
 
 #### Example Usage
 
 ```javascript
-const exampleActionAccessToken = btoa(
+const exampleWebhookAccessToken = btoa(
   JSON.stringify({ userId: "1", clientId: "2" })
 );
-window.nventrAgent.setActionsAccessToken(exampleActionAccessToken);
+window.nventrAgent.setWebhookAccessToken(exampleWebhookAccessToken);
 ```
 
 #### Parameters
@@ -227,8 +219,8 @@ Registers a callback function for a specific action. The callback is executed wh
 #### Example
 
 ```javascript
-window.nventrAgent.addActionListener('actionName', function(data) {
-  console.log('Action received:', data);
+window.nventrAgent.addActionListener("actionName", function (data) {
+  console.log("Action received:", data);
 });
 ```
 
@@ -244,7 +236,7 @@ Registers a callback function for all actions. The callback is executed when any
 
 ```javascript
 window.nventrAgent.onAction((name, value) => {
-  console.log('Action received:', name, value);
+  console.log("Action received:", name, value);
 });
 ```
 
@@ -261,7 +253,7 @@ Registers a callback function for multiple actions. The callback is executed whe
 ```javascript
 window.nventrAgent.onActions((actions) => {
   actions.forEach(({ name, value }) => {
-    console.log('Action received:', name, value);
+    console.log("Action received:", name, value);
   });
 });
 ```
@@ -273,13 +265,13 @@ You can set up an Express server to handle the `actionsCallbackUrl` and process 
 Example:
 
 ```javascript
-const express = require('express');
-const bodyParser = require('body-parser');
+const express = require("express");
+const bodyParser = require("body-parser");
 const app = express();
 
 app.use(bodyParser.json());
 
-app.post('/actions', async (req, res) => {
+app.post("/actions", async (req, res) => {
   const actions = req.body.actions;
   const tokenVals = {}; // Assume tokenVals is obtained from the request headers or other means
   const ret = { success: false, actions: [] };
@@ -340,7 +332,6 @@ app.listen(PORT, () => {
 ```
 
 In this example, the Express server listens for POST requests at the `/actions` endpoint. It processes each action received in the `data.actions` array and logs the action name and data. You can customize the handling logic for each action as needed.
-
 
 ### restore()
 
@@ -406,10 +397,12 @@ app.use(express.json());
 // Add the actionsCallbackUrl route
 // Example actionsCallbackUrl: https://www.myapp.com/agent/actions
 app.use("/agent/actions", async (req, res) => {
-  // Get the actionAccessToken from the request headers
+  // Get the webhookActionToken from the request headers
   // The token is supplied by the web app to the agent
-  const actionAccessToken = req.headers["nventr-agent-actions-access-token"];
-  const tokenVals = actionAccessToken ? decryptToken(actionAccessToken) : null;
+  const webhookActionToken = req.headers["nventr-agent-webhook-access-token"];
+  const tokenVals = webhookActionToken
+    ? decryptToken(webhookActionToken)
+    : null;
   if (!tokenVals) return res.status(401).send("Invalid token");
 
   // Get the action name and value from the request body
@@ -515,7 +508,7 @@ app.listen(port, () => {
 
 2. **Token Extraction and Validation**:
 
-   - The `actionAccessToken` is extracted from the request headers using the header name `nventr-agent-actions-access-token`.
+   - The `webhookActionToken` is extracted from the request headers using the header name `nventr-agent-webhook-access-token`.
    - The token is decrypted using the `decryptToken` function. If the token is invalid or missing, a `401 Unauthorized` response is sent.
 
 3. **Action Handling**:
@@ -539,8 +532,8 @@ app.listen(port, () => {
 
 ### Security
 
-- The `actionAccessToken` should be a secure token like a JWT, which is passed in the header `nventr-agent-actions-access-token`.
-- The token is used to authenticate and authorize the actions performed by the client on the server.
+- The `webhookActionToken` should be a secure token like a JWT, which is passed in the header `nventr-agent-webhook-access-token`.
+- The token is used to authenticate and authorize the webhook actions performed by the client on the server.
 
 This setup ensures that only authorized actions are performed and that the actions are securely authenticated using the provided token.
 v

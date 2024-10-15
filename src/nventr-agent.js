@@ -57,7 +57,7 @@ function init() {
     onRendered: null,
     onAction: null,
     onActions: null,
-    actionsAccessToken: null,
+    webhookAccessToken: null,
   };
   let rendered = false;
   window.addEventListener("message", function (event) {
@@ -94,8 +94,8 @@ function init() {
       case "rendered":
         agentState.rendered = true;
         agentState.onRenderedCallback && agentState.onRenderedCallback();
-        agentState.actionsAccessToken &&
-          setActionsAccessToken(agentState.actionsAccessToken);
+        agentState.webhookAccessToken &&
+          setWebhookAccessToken(agentState.webhookAccessToken);
         fadeInWrapper();
         break;
       default:
@@ -180,14 +180,14 @@ function init() {
     wrapper.style.right = "32px";
     updateWindowState(WINDOW_STATE_FULLSCREEN);
   };
-  const setActionsAccessToken = (actionsAccessToken) => {
-    agentState.actionsAccessToken = actionsAccessToken;
+  const setWebhookAccessToken = (webhookAccessToken) => {
+    agentState.webhookAccessToken = webhookAccessToken;
     if (!agentState.rendered) return;
     iframe.contentWindow.postMessage(
       {
         source: "nventr-agent",
-        type: "actionsAccessToken",
-        payload: actionsAccessToken,
+        type: "webhookAccessToken",
+        payload: webhookAccessToken,
       },
       "*"
     );
@@ -294,8 +294,8 @@ function init() {
 
     // Set the options
     if (options.onRendered) agentState.onRenderedCallback = options.onRendered;
-    if (options.actionsAccessToken)
-      agentState.actionsAccessToken = options.actionsAccessToken;
+    if (options.webhookAccessToken)
+      agentState.webhookAccessToken = options.webhookAccessToken;
     if (options.onAction) agentState.onAction = options.onAction;
     if (options.onActions) agentState.onActions = options.onActions;
     // Create the wrapper
@@ -316,6 +316,7 @@ function init() {
       ? `https://dev-agent.inventr.ai?agentAccessKey=${agentAccessKey}`
       : `https://agent.inventr.ai?agentAccessKey=${agentAccessKey}`;
     iframe.allow = "microphone";
+    iframe.allowusermedia = "true";
     wrapper.appendChild(iframe);
     wrapper.appendChild(handle);
     wrapper.appendChild(collapseButton);
@@ -387,9 +388,9 @@ function init() {
     render: (options) => {
       render(options);
     },
-    setActionsAccessToken: (actionsAccessToken) =>
-      setActionsAccessToken(actionsAccessToken),
-    removeActionsAccessToken: () => setActionsAccessToken(null),
+    setWebhookAccessToken: (webhookAccessToken) =>
+      setWebhookAccessToken(webhookAccessToken),
+    removeWebhookAccessToken: () => setWebhookAccessToken(null),
     addActionListener: (name, callback) => {
       const callbackItem = {
         name,
