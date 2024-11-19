@@ -170,6 +170,11 @@ Renders the chatbot interface. The `options` object can include:
 - `collapse`: If true, the chatbot starts in a collapsed state.
 - `dev`: If true, the chatbot connects to the development server.
 - `id` or `agentAccessKey`: The access key for the agent.
+- `height`: The height of the chatbot interface.
+- `width`: The width of the chatbot interface.
+- `margin`: The margin around the chatbot interface (numeric value).
+- `radius`: The border radius of the chatbot interface (numeric value).
+- `theme`: The theme of the chatbot interface.
 
 These options can also be passed as URL parameters when loading the agent:
 
@@ -187,6 +192,11 @@ window.nventrAgent.render({
   collapse: true,
   dev: true,
   id: "yourid",
+  height: 500,
+  width: 300,
+  margin: 10,
+  radius: 5,
+  theme: "dark",
 });
 ```
 
