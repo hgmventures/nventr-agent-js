@@ -80,6 +80,7 @@ function init() {
     width: 352,
     margin: 16,
     radius: 4,
+    zIndex: 10,
     windowState: WINDOW_STATE_NONE,
   };
   window.addEventListener("message", function (event) {
@@ -116,7 +117,7 @@ function init() {
       case "rendered":
         // Check the options
         let childOptions = event.data.payload;
-        ["margin", "radius", "height", "width"].forEach((option) => {
+        ["margin", "radius", "height", "width", "zIndex"].forEach((option) => {
           if (
             option in childOptions &&
             childOptions[option] !== null &&
@@ -283,6 +284,7 @@ function init() {
       borderRadius: `${agentState.radius}px`,
       height: `${agentState.height}px`,
       width: `${agentState.width}px`,
+      "z-index": agentState.zIndex,
     });
     switch (agentState.windowState) {
       case WINDOW_STATE_COLLAPSED:
@@ -332,6 +334,7 @@ function init() {
       collapse: parseParamValue("collapse", false),
       render: parseParamValue("render", true),
       margin: parseParamValue("margin", null),
+      zIndex: parseParamValue("zIndex", null),
       radius: parseParamValue("radius", null),
       theme: parseParamValue("theme", null),
     };
@@ -359,9 +362,11 @@ function init() {
     if (options.radius) agentState.radius = options.radius;
     if (options.height) agentState.height = options.height;
     if (options.width) agentState.width = options.width;
+    if (options.zIndex) agentState.zIndex = options.zIndex;
 
     // Create the wrapper
-    wrapper.id = "nventrAgentWrapper";
+    // Make the wrapper id unique
+    wrapper.id = `nventrAgentWrapper_${Date.now()}`;
     addStyles(wrapper, {
       ...styles.wrapper,
       bottom: `${agentState.margin}px`,
