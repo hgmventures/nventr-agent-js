@@ -71,11 +71,13 @@ function init() {
   const WINDOW_STATE_FULLSCREEN = "FULLSCREEN";
   const actionListeners = [];
   const agentState = {
+    visible: false,
     rendered: false,
     onRendered: null,
     onAction: null,
     onActions: null,
     webhookAccessToken: null,
+    metadata: null,
     height: 448,
     width: 352,
     margin: 16,
@@ -114,6 +116,8 @@ function init() {
           handleAction(name, value);
         });
         break;
+      case "onBeforeNewConversation":
+        break;
       case "rendered":
         // Check the options
         let childOptions = event.data.payload;
@@ -129,6 +133,7 @@ function init() {
         agentState.onRenderedCallback && agentState.onRenderedCallback();
         agentState.webhookAccessToken &&
           setWebhookAccessToken(agentState.webhookAccessToken);
+        agentState.metadata && setMetadata(agentState.metadata);
         finalizeRender();
         break;
       default:
@@ -231,6 +236,30 @@ function init() {
       "*"
     );
   };
+  const setConversationUuid = (conversationUuid) => {
+    agentState.setConversationUuid = conversationUuid;
+    if (!agentState.rendered) return;
+    iframe.contentWindow.postMessage(
+      {
+        source: "nventr-agent",
+        type: "conversationUuid",
+        payload: conversationUuid,
+      },
+      "*"
+    );
+  };
+  const setMetadata = (metadata) => {
+    agentState.metadata = metadata;
+    if (!agentState.rendered) return;
+    iframe.contentWindow.postMessage(
+      {
+        source: "nventr-agent",
+        type: "metadata",
+        payload: metadata,
+      },
+      "*"
+    );
+  };
   const updateWindowState = (windowState) => {
     agentState.windowState = windowState;
     iframe.contentWindow.postMessage(
@@ -272,6 +301,24 @@ function init() {
         break;
     }
   };
+  const show = () => {
+    if (agentState.visible) return;
+    wrapper.animate([{ opacity: 0 }, { opacity: 1 }], {
+      duration: 800,
+      easing: "linear",
+      fill: "forwards",
+    });
+    agentState.visible = true;
+  };
+  const hide = () => {
+    if (!agentState.visible) return;
+    wrapper.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 800,
+      easing: "linear",
+      fill: "forwards",
+    });
+    agentState.visible = false;
+  };
   const remove = () => {
     wrapper.getAnimations().forEach((animation) => animation.cancel());
     wrapper.remove();
@@ -296,11 +343,7 @@ function init() {
       default:
       // do nothing
     }
-    wrapper.animate([{ opacity: 0 }, { opacity: 1 }], {
-      duration: 800,
-      easing: "linear",
-      fill: "forwards",
-    });
+    show();
   };
   const getOptionsByUrl = () => {
     const script = document.getElementById("nventr-agent");
@@ -330,6 +373,7 @@ function init() {
     return {
       id: parseParamValue("id", null),
       dev: parseParamValue("dev", false),
+      uat: parseParamValue("uat", false),
       fullscreen: parseParamValue("fullscreen", false),
       collapse: parseParamValue("collapse", false),
       render: parseParamValue("render", true),
@@ -337,12 +381,14 @@ function init() {
       zIndex: parseParamValue("zIndex", null),
       radius: parseParamValue("radius", null),
       theme: parseParamValue("theme", null),
+      conversationUuid: parseParamValue("conversationUuid", null),
     };
   };
-
   const render = (options = {}) => {
     // Parse the script source to get the query params using id nventr-agent
     const dev = options.dev || false;
+    const uat = options.uat || false;
+
     const agentAccessKey = options.id || options.agentAccessKey;
     if (!agentAccessKey) {
       console.warn(
@@ -356,6 +402,7 @@ function init() {
     if (options.onRendered) agentState.onRenderedCallback = options.onRendered;
     if (options.webhookAccessToken)
       agentState.webhookAccessToken = options.webhookAccessToken;
+    if (options.metadata) agentState.metadata = options.metadata;
     if (options.onAction) agentState.onAction = options.onAction;
     if (options.onActions) agentState.onActions = options.onActions;
     if (options.margin) agentState.margin = options.margin;
@@ -363,6 +410,8 @@ function init() {
     if (options.height) agentState.height = options.height;
     if (options.width) agentState.width = options.width;
     if (options.zIndex) agentState.zIndex = options.zIndex;
+    if (options.conversationUuid)
+      agentState.conversationUuid = options.conversationUuid;
 
     // Create the wrapper
     // Make the wrapper id unique
@@ -395,12 +444,17 @@ function init() {
     const iframeQueryParams = [];
     if (options.theme) iframeQueryParams.push(`theme=${options.theme}`);
     if (options.radius) iframeQueryParams.push(`radius=${options.radius}`);
+    if (options.conversationUuid)
+      iframeQueryParams.push(`conversationUuid=${options.conversationUuid}`);
     const iframeQueryStr = iframeQueryParams.length
       ? `&${iframeQueryParams.join("&")}`
       : "";
-    iframe.src = dev
-      ? `https://dev-agent.inventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`
-      : `https://agent.inventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`;
+    const iframeSrc = `https://agent.inventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`;
+    if (uat)
+      iframeSrc = `https://uat-agent.inventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`;
+    else if (dev)
+      iframeSrc = `https://dev-agent.inventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`;
+    iframe.src = iframeSrc;
     iframe.allow = "microphone";
     iframe.allowusermedia = "true";
     wrapper.appendChild(iframe);
@@ -475,6 +529,9 @@ function init() {
     setWebhookAccessToken: (webhookAccessToken) =>
       setWebhookAccessToken(webhookAccessToken),
     removeWebhookAccessToken: () => setWebhookAccessToken(null),
+    setConversationUuid: (conversationUuid) =>
+      setConversationUuid(conversationUuid),
+    removeConversationUuid: () => setConversationUuid(null),
     addActionListener: (name, callback) => {
       const callbackItem = {
         name,
@@ -511,6 +568,8 @@ function init() {
     restore: () => restore(),
     collapse: () => collapse(),
     fullscreen: () => fullscreen(),
+    show: () => show(),
+    hide: () => hide(),
     margin: (margin) => {
       agentState.margin = margin;
     },
