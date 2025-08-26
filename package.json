@@ -1,6 +1,6 @@
 {
   "name": "@nventr.ai/nventr-agent",
-  "version": "1.1.9",
+  "version": "1.2.2",
   "description": "Core javascript for including nventr-agent in a web application.",
   "main": "dist/nventr-agent.js",
   "scripts": {

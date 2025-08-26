@@ -449,7 +449,7 @@ function init() {
     const iframeQueryStr = iframeQueryParams.length
       ? `&${iframeQueryParams.join("&")}`
       : "";
-    const iframeSrc = `https://agent.inventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`;
+    let iframeSrc = `https://agent.inventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`;
     if (uat)
       iframeSrc = `https://uat-agent.inventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`;
     else if (dev)
