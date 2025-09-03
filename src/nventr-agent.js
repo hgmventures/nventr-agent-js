@@ -59,16 +59,33 @@ function init() {
   const handle = document.createElement("div");
   const collapseButton = document.createElement("div");
   const fullscreenButton = document.createElement("div");
+  const fabButton = document.createElement("div");
   const iframe = document.createElement("iframe");
   const dragContainer = document;
   // const CHATBOT_HEIGHT = 448;
   // const agentState.width = 352;
   // const CHATBOT_MARGIN = 16;
   // const CHATBOT_RADIUS = 4;
-  const CHATBOT_COLLAPSED_HEIGHT = 36;
+
   const WINDOW_STATE_NONE = "NONE";
   const WINDOW_STATE_COLLAPSED = "COLLAPSED";
   const WINDOW_STATE_FULLSCREEN = "FULLSCREEN";
+  const COLLAPSED_TYPE_MINIMIZED = "MINIMIZED";
+  const COLLAPSED_TYPE_FAB = "FAB";
+  const CHATBOT_COLLAPSED_HEIGHT = 36;
+  const layout = {
+    collapsed: {
+      [COLLAPSED_TYPE_MINIMIZED]: {
+        height: 36,
+      },
+      [COLLAPSED_TYPE_FAB]: {
+        height: 56,
+        width: 56,
+        borderRadius: 16,
+        margin: 16,
+      },
+    },
+  };
   const actionListeners = [];
   const agentState = {
     visible: false,
@@ -81,9 +98,10 @@ function init() {
     height: 448,
     width: 352,
     margin: 16,
-    radius: 4,
+    radius: 16,
     zIndex: 10,
     windowState: WINDOW_STATE_NONE,
+    collapsedType: COLLAPSED_TYPE_FAB,
   };
   window.addEventListener("message", function (event) {
     if (!event || !event.data || event.data.source !== "nventr-agent") return;
@@ -140,6 +158,20 @@ function init() {
       // Do nothing
     }
   });
+  const handleResponsive = () => {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    if (width === agentState.windowWidth && height === agentState.windowHeight)
+      return;
+    agentState.windowWidth = width;
+    agentState.windowHeight = height;
+    // If it is a standard window, call restore to make sure it fits in the viewport
+    agentState.rendered &&
+      agentState.windowState === WINDOW_STATE_NONE &&
+      restore({ resetPosition: false });
+  };
+  window.addEventListener("resize", handleResponsive);
+  window.addEventListener("DOMContentLoaded", handleResponsive);
   const addStyles = (element, styles) =>
     Object.keys(styles).forEach(
       (style) => (element.style[style] = styles[style])
@@ -149,14 +181,23 @@ function init() {
     e.stopPropagation();
   };
   const handleMouseDown = (e) => {
+    // Do not allow dragging in fullscreen or when collapsed to FAB
     if (agentState.windowState === WINDOW_STATE_FULLSCREEN) return;
+    if (
+      agentState.windowState === WINDOW_STATE_COLLAPSED &&
+      agentState.collapsedType === COLLAPSED_TYPE_FAB
+    )
+      return;
     stopEvents(e);
     let clientX = e.clientX;
     let clientY = e.clientY;
-    let height =
-      agentState.windowState === WINDOW_STATE_COLLAPSED
-        ? CHATBOT_COLLAPSED_HEIGHT
-        : agentState.height;
+    // let height =
+    //   agentState.windowState === WINDOW_STATE_COLLAPSED
+    //     ? CHATBOT_COLLAPSED_HEIGHT
+    //     : agentState.height;
+    let height = wrapper.offsetHeight;
+    let width = wrapper.offsetWidth;
+    let margin = agentState.margin;
     iframe.style.pointerEvents = "none";
     handle.onmousedown = null;
     const handleMouseMove = (e) => {
@@ -165,13 +206,33 @@ function init() {
       let left = wrapper.offsetLeft - (clientX - e.clientX);
       clientX = e.clientX;
       clientY = e.clientY;
-      if (top < 0) top = 0;
-      if (left < 0) left = 0;
-      if (left + agentState.width > window.innerWidth)
-        left = window.innerWidth - agentState.width;
-      if (top + height > window.innerHeight) top = window.innerHeight - height;
-      wrapper.style.top = top + "px";
-      wrapper.style.left = left + "px";
+      if (top < margin) top = margin;
+      if (left < margin) left = margin;
+      let snapRight = false;
+      let snapBottom = false;
+      if (left + width >= window.innerWidth - margin) {
+        left = window.innerWidth - width - margin;
+        snapRight = true;
+      }
+      if (top + height >= window.innerHeight - margin) {
+        top = window.innerHeight - height - margin;
+        snapBottom = true;
+      }
+      if (snapRight && snapBottom) {
+        addStyles(wrapper, {
+          bottom: `${margin}px`,
+          right: `${margin}px`,
+          top: null,
+          left: null,
+        });
+      } else {
+        addStyles(wrapper, {
+          top: `${top}px`,
+          left: `${left}px`,
+          bottom: null,
+          right: null,
+        });
+      }
     };
     const handleMouseUp = (e) => {
       stopEvents(e);
@@ -186,29 +247,127 @@ function init() {
     dragContainer.addEventListener("mouseleave", handleMouseUp);
     e.preventDefault;
   };
+  const defaultBoxShadow =
+    "0px 1.5px 5px 0px rgba(0,0,0,0.14), 0px 3px 14px 2px rgba(0,0,0,0.12), 0px 8px 10px 1px rgba(0,0,0,0.20)";
   const collapse = () => {
-    wrapper.style.height = `${CHATBOT_COLLAPSED_HEIGHT}px`;
-    wrapper.style.width = `${agentState.width}px`;
-    wrapper.style.top = null;
-    wrapper.style.left = null;
-    wrapper.style.bottom = `${agentState.margin}px`;
-    wrapper.style.right = `${agentState.margin}px`;
-    // // Floating action button dev
-    // wrapper.style.height = "56px";
-    // wrapper.style.width = "56px";
-    // wrapper.style.borderRadius = "28px";
-    // iframe.style.borderRadius = "28px";
+    const collapedLayout = layout.collapsed[agentState.collapsedType];
+    motionFadeIn();
+    switch (agentState.collapsedType) {
+      case COLLAPSED_TYPE_FAB:
+        addStyles(wrapper, {
+          height: `${collapedLayout.height}px`,
+          width: `${collapedLayout.width}px`,
+          borderRadius: `${collapedLayout.borderRadius}px`,
+          bottom: `${agentState.margin}px`,
+          right: `${agentState.margin}px`,
+          top: null,
+          left: null,
+        });
+        showCollapseFabButton();
+        break;
+      default: // COLLAPSED_TYPE_MINIMIZED
+        addStyles(wrapper, {
+          height: `${collapedLayout.height}px`,
+          width: `${agentState.width}px`,
+          bottom: `${agentState.margin}px`,
+          right: `${agentState.margin}px`,
+          top: null,
+          left: null,
+        });
+    }
+    addStyles(wrapper, {
+      boxShadow:
+        "0px 1.5px 5px 0px rgba(0,0,0,0.14), 0px 3px 14px 2px rgba(0,0,0,0.12), 0px 8px 10px 1px rgba(0,0,0,0.20)",
+    });
     updateWindowState(WINDOW_STATE_COLLAPSED);
   };
-  const restore = () => {
-    wrapper.style.height = `${agentState.height}px`;
-    wrapper.style.width = `${agentState.width}px`;
-    wrapper.style.top = null;
-    wrapper.style.left = null;
-    wrapper.style.bottom = `${agentState.margin}px`;
-    wrapper.style.right = `${agentState.margin}px`;
-    // wrapper.style.borderRadius = "0px";
-    // iframe.style.borderRadius = "0px";
+  const restore = (options = {}) => {
+    const { resetPosition = true } = options;
+    if (resetPosition) {
+      addStyles(wrapper, {
+        bottom: `${agentState.margin}px`,
+        right: `${agentState.margin}px`,
+        top: null,
+        left: null,
+      });
+    }
+    let { height, width, margin } = agentState;
+    let { innerHeight, innerWidth } = window;
+
+    // Check if ancor is top/left or bottom/right
+    const anchorPosition =
+      wrapper.style.bottom && wrapper.style.right ? "bottom-right" : "top-left";
+    switch (anchorPosition) {
+      case "top-left":
+        // For top position you can use the height directly
+        height = agentState.height;
+        width = agentState.width;
+        const { offsetTop, offsetLeft } = wrapper;
+
+        // Check if it fits in the viewport
+        let updateTopLeft = false;
+        let top = offsetTop;
+        let left = offsetLeft;
+        if (offsetTop + height + margin > innerHeight) {
+          top = innerHeight - height - margin;
+          if (top < margin) top = margin;
+          updateTopLeft = true;
+        }
+        if (offsetLeft + width + margin > innerWidth) {
+          left = innerWidth - width - margin;
+          if (left < margin) left = margin;
+          updateTopLeft = true;
+        }
+        if (updateTopLeft) {
+          // Check for snap
+          if (
+            top + height + margin >= innerHeight &&
+            left + width + margin >= innerWidth
+          )
+            return addStyles(wrapper, {
+              bottom: `${margin}px`,
+              right: `${margin}px`,
+              top: null,
+              left: null,
+            });
+          else
+            addStyles(wrapper, {
+              bottom: null,
+              right: null,
+              top: `${top}px`,
+              left: `${left}px`,
+            });
+        }
+        if (height + margin * 2 > innerHeight)
+          height = innerHeight - margin * 2;
+        if (width + margin * 2 > innerWidth) width = innerWidth - margin * 2;
+        break;
+      case "bottom-right":
+        if (height + margin * 2 > innerHeight)
+          height = innerHeight - margin * 2;
+        if (width + margin * 2 > innerWidth) width = innerWidth - margin * 2;
+        break;
+      default:
+      // Do nothing
+    }
+    addStyles(wrapper, {
+      height: `${height}px`,
+      width: `${width}px`,
+      boxShadow: defaultBoxShadow,
+    });
+    if (resetPosition) motionFadeIn();
+    // wrapper.animate(
+    //   [
+    //     { opacity: 0, transform: "scale(0.92)" },
+    //     { opacity: 1, transform: "scale(1)" },
+    //   ],
+    //   {
+    //     duration: 300,
+    //     easing: "cubic-bezier(0.2, 0, 0, 1)", // Material easing
+    //     fill: "forwards",
+    //   }
+    // );
+    hideCollapseFabButton();
     updateWindowState(WINDOW_STATE_NONE);
   };
   const fullscreen = () => {
@@ -220,9 +379,19 @@ function init() {
     wrapper.style.left = `${agentState.margin}px`;
     wrapper.style.bottom = `${agentState.margin}px`;
     wrapper.style.right = `${agentState.margin}px`;
+    wrapper.style.boxShadow = defaultBoxShadow;
     // wrapper.style.borderRadius = "0px";
     // iframe.style.borderRadius = "0px";
+    hideCollapseFabButton();
     updateWindowState(WINDOW_STATE_FULLSCREEN);
+  };
+  const showCollapseFabButton = () => {
+    if (agentState.collapsedType === COLLAPSED_TYPE_FAB)
+      fabButton.style.display = "block";
+    else fabButton.style.display = "none";
+  };
+  const hideCollapseFabButton = () => {
+    fabButton.style.display = "none";
   };
   const setWebhookAccessToken = (webhookAccessToken) => {
     agentState.webhookAccessToken = webhookAccessToken;
@@ -301,6 +470,27 @@ function init() {
         break;
     }
   };
+  const motionFadeIn = ({ duration = 800 } = {}) => {
+    wrapper.animate(
+      [
+        { opacity: 0, transform: "scale(0.92)" },
+        { opacity: 1, transform: "scale(1)" },
+      ],
+      {
+        duration: 300,
+        easing: "cubic-bezier(0.2, 0, 0, 1)", // Material easing
+        fill: "forwards",
+      }
+    );
+  };
+  const fadeIn = ({ options = {} }) => {
+    const duration = options.duration || 800;
+    wrapper.animate([{ opacity: 0 }, { opacity: 1 }], {
+      duration: duration,
+      easing: "linear",
+      fill: "forwards",
+    });
+  };
   const show = () => {
     if (agentState.visible) return;
     wrapper.animate([{ opacity: 0 }, { opacity: 1 }], {
@@ -323,6 +513,7 @@ function init() {
     wrapper.getAnimations().forEach((animation) => animation.cancel());
     wrapper.remove();
     agentState.rendered = false;
+    agentState.visible = false;
   };
   const finalizeRender = () => {
     addStyles(wrapper, {
@@ -436,6 +627,12 @@ function init() {
     // Create the fullscreen button
     addStyles(fullscreenButton, styles.fullscreenButton);
     fullscreenButton.onclick = handleFullscreenButtonClick;
+    // Create the fab button
+    addStyles(fabButton, {
+      ...styles.fabButton,
+      display: "none",
+    });
+    fabButton.onclick = handleCollapseButtonClick;
     // Create the iframe
     addStyles(iframe, {
       ...styles.iframe,
@@ -461,6 +658,7 @@ function init() {
     wrapper.appendChild(handle);
     wrapper.appendChild(collapseButton);
     wrapper.appendChild(fullscreenButton);
+    wrapper.appendChild(fabButton);
     document.body.appendChild(wrapper);
 
     if (options.collapse === true)
@@ -475,7 +673,8 @@ function init() {
       position: "fixed",
       zIndex: "10",
       opacity: "0",
-      boxShadow: "0px 1px 10px 1px rgba(0, 0, 0, .2)",
+      boxShadow: defaultBoxShadow,
+      // boxShadow: "0px 1px 10px 1px rgba(0, 0, 0, .2)",
       borderWidth: "0px",
       overflow: "hidden",
     },
@@ -493,6 +692,16 @@ function init() {
       right: "32px",
       height: "32px",
       width: "32px",
+      opacity: "0",
+    },
+    fabButton: {
+      "z-Index": "11",
+      cursor: "pointer",
+      position: "absolute",
+      top: "0px",
+      right: "0px",
+      bottom: "0px",
+      left: "0px",
       opacity: "0",
     },
     fullscreenButton: {
