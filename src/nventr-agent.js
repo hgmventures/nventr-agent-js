@@ -892,6 +892,3 @@ function init() {
 const nventrAgent = window.nventrAgent || init();
 window.nventrAgent = nventrAgent;
 window.inventrAgent = nventrAgent;
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = nventrAgent;
-}
