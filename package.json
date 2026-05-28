@@ -1,10 +1,11 @@
 {
   "name": "@nventr.ai/nventr-agent",
-  "version": "1.2.4",
+  "version": "1.4.0",
   "description": "Core javascript for including nventr-agent in a web application.",
   "main": "dist/nventr-agent.js",
   "scripts": {
-    "build": "uglifyjs src/nventr-agent.js --compress --mangle --warn --output dist/nventr-agent.js"
+    "build": "uglifyjs src/nventr-agent.js --compress --mangle --warn --output dist/nventr-agent.js",
+    "dev": "cp src/nventr-agent.js dist/nventr-agent.js && nodemon --watch src/nventr-agent.js --exec 'cp src/nventr-agent.js dist/nventr-agent.js'"
   },
   "repository": {
     "type": "git",

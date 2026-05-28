@@ -1,10 +1,10 @@
 # nventr-agent.js
 
-This JavaScript module is responsible for managing the Nventr agent.
+This JavaScript module is responsible for managing the nventr agent.
 
 ## Including the agent in your HTML
 
-To include the agent in your HTML, use a script tag. The script tag must have an `id` of "nventr-agent".
+To include the agent in your HTML, use a script tag. The script tag must have an `id` of `"nventr-agent"`.
 
 Example:
 
@@ -12,9 +12,11 @@ Example:
 <!-- Including the agent with an id -->
 <script
   id="nventr-agent"
-  src="https://agent.inventr.ai/nventr-agent.js?id=yourid"
+  src="https://agent.app.nventr.ai/nventr-agent.js?id=yourid"
 ></script>
 ```
+
+> **Legacy URL**: The previous CDN URL `https://agent.inventr.ai/nventr-agent.js` is no longer active. Use `https://agent.app.nventr.ai/nventr-agent.js`.
 
 In this example, the `id` is included as a query parameter in the URL. When the script is loaded, the agent will use this `id` for its operations.
 
@@ -24,7 +26,7 @@ If you want to include the agent but not render it immediately, you can set the 
 <!-- Including the agent with render=false and no id -->
 <script
   id="nventr-agent"
-  src="https://agent.inventr.ai/nventr-agent.js?render=false"
+  src="https://agent.app.nventr.ai/nventr-agent.js?render=false"
 ></script>
 ```
 
@@ -45,7 +47,7 @@ To ensure that the `window.nventrAgent` object is available before using it, you
 <!-- Including the agent script -->
 <script
   id="nventr-agent"
-  src="https://agent.inventr.ai/nventr-agent.js?id=yourid"
+  src="https://agent.app.nventr.ai/nventr-agent.js?id=yourid"
 ></script>
 
 <script>

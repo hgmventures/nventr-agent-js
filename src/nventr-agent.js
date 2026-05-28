@@ -70,8 +70,12 @@ function init() {
   const WINDOW_STATE_NONE = "NONE";
   const WINDOW_STATE_COLLAPSED = "COLLAPSED";
   const WINDOW_STATE_FULLSCREEN = "FULLSCREEN";
+  const WINDOW_STATE_RESPONSIVE = "RESPONSIVE";
+  const WINDOW_STATE_SIDEBAR = "SIDEBAR";
   const COLLAPSED_TYPE_MINIMIZED = "MINIMIZED";
   const COLLAPSED_TYPE_FAB = "FAB";
+  const SIDEBAR_POSITION_LEFT = "LEFT";
+  const SIDEBAR_POSITION_RIGHT = "RIGHT";
   const CHATBOT_COLLAPSED_HEIGHT = 36;
   const layout = {
     collapsed: {
@@ -94,7 +98,9 @@ function init() {
     onAction: null,
     onActions: null,
     webhookAccessToken: null,
+    mcpAccessTokens: {},
     metadata: null,
+    context: null,
     height: 448,
     width: 352,
     margin: 16,
@@ -137,7 +143,22 @@ function init() {
       case "onBeforeNewConversation":
         break;
       case "rendered":
-        // Check the options
+        // Iframe reloaded (e.g. user picked "New Conversation"): re-sync
+        // parent state to the child so it doesn't fall back to its initial
+        // (collapsed/FAB) state and so the new conversation gets the same
+        // host-supplied tokens, metadata, and context.
+        if (agentState.rendered) {
+          agentState.webhookAccessToken &&
+            setWebhookAccessToken(agentState.webhookAccessToken);
+          Object.keys(agentState.mcpAccessTokens).length > 0 &&
+            setMcpAccessTokens(agentState.mcpAccessTokens);
+          agentState.metadata && setMetadata(agentState.metadata);
+          agentState.context && setContext(agentState.context);
+          // Re-sync the current windowState so the child UI matches the
+          // parent wrapper (expanded vs collapsed-to-FAB).
+          updateWindowState(agentState.windowState);
+          break;
+        }
         let childOptions = event.data.payload;
         ["margin", "radius", "height", "width", "zIndex"].forEach((option) => {
           if (
@@ -151,7 +172,10 @@ function init() {
         agentState.onRenderedCallback && agentState.onRenderedCallback();
         agentState.webhookAccessToken &&
           setWebhookAccessToken(agentState.webhookAccessToken);
+        Object.keys(agentState.mcpAccessTokens).length > 0 &&
+          setMcpAccessTokens(agentState.mcpAccessTokens);
         agentState.metadata && setMetadata(agentState.metadata);
+        agentState.context && setContext(agentState.context);
         finalizeRender();
         break;
       default:
@@ -161,20 +185,27 @@ function init() {
   const handleResponsive = () => {
     const width = window.innerWidth;
     const height = window.innerHeight;
+    // Don't run if wrapper isn't in the DOM
+    if (!document.body.contains(wrapper)) return;
     if (width === agentState.windowWidth && height === agentState.windowHeight)
       return;
     agentState.windowWidth = width;
     agentState.windowHeight = height;
     // If it is a standard window, call restore to make sure it fits in the viewport
-    agentState.rendered &&
-      agentState.windowState === WINDOW_STATE_NONE &&
+    if (
+      [WINDOW_STATE_NONE, WINDOW_STATE_RESPONSIVE].includes(
+        agentState.windowState,
+      ) &&
+      wrapper.style.height
+    ) {
       restore({ resetPosition: false });
+    }
   };
   window.addEventListener("resize", handleResponsive);
   window.addEventListener("DOMContentLoaded", handleResponsive);
   const addStyles = (element, styles) =>
     Object.keys(styles).forEach(
-      (style) => (element.style[style] = styles[style])
+      (style) => (element.style[style] = styles[style]),
     );
   const stopEvents = (e) => {
     e.preventDefault();
@@ -182,7 +213,12 @@ function init() {
   };
   const handleMouseDown = (e) => {
     // Do not allow dragging in fullscreen or when collapsed to FAB
-    if (agentState.windowState === WINDOW_STATE_FULLSCREEN) return;
+    if (
+      [WINDOW_STATE_FULLSCREEN, WINDOW_STATE_RESPONSIVE].includes(
+        agentState.windowState,
+      )
+    )
+      return;
     if (
       agentState.windowState === WINDOW_STATE_COLLAPSED &&
       agentState.collapsedType === COLLAPSED_TYPE_FAB
@@ -248,7 +284,7 @@ function init() {
     e.preventDefault;
   };
   const defaultBoxShadow =
-    "0px 1.5px 5px 0px rgba(0,0,0,0.14), 0px 3px 14px 2px rgba(0,0,0,0.12), 0px 8px 10px 1px rgba(0,0,0,0.20)";
+    "0px 1.5px 5px 0px rgba(0,0,0,0.06), 0px 3px 14px 2px rgba(0,0,0,0.05), 0px 8px 10px 1px rgba(0,0,0,0.08)";
   const collapse = () => {
     const collapedLayout = layout.collapsed[agentState.collapsedType];
     motionFadeIn();
@@ -276,8 +312,7 @@ function init() {
         });
     }
     addStyles(wrapper, {
-      boxShadow:
-        "0px 1.5px 5px 0px rgba(0,0,0,0.14), 0px 3px 14px 2px rgba(0,0,0,0.12), 0px 8px 10px 1px rgba(0,0,0,0.20)",
+      boxShadow: defaultBoxShadow,
     });
     updateWindowState(WINDOW_STATE_COLLAPSED);
   };
@@ -294,10 +329,30 @@ function init() {
     let { height, width, margin } = agentState;
     let { innerHeight, innerWidth } = window;
 
+    const MOBILE_WIDTH_THRESHOLD = 480; // Tablets and below
+    const MOBILE_HEIGHT_THRESHOLD = 600;
+    const isMobileViewport =
+      innerWidth <= MOBILE_WIDTH_THRESHOLD ||
+      innerHeight <= MOBILE_HEIGHT_THRESHOLD;
+
+    const anchorPosition = isMobileViewport
+      ? "responsive"
+      : wrapper.style.bottom && wrapper.style.right
+        ? "bottom-right"
+        : "top-left";
+
     // Check if ancor is top/left or bottom/right
-    const anchorPosition =
-      wrapper.style.bottom && wrapper.style.right ? "bottom-right" : "top-left";
     switch (anchorPosition) {
+      case "responsive":
+        height = innerHeight - margin * 2;
+        width = innerWidth - margin * 2;
+        addStyles(wrapper, {
+          bottom: `${agentState.margin}px`,
+          right: `${agentState.margin}px`,
+          top: null,
+          left: null,
+        });
+        break;
       case "top-left":
         // For top position you can use the height directly
         height = agentState.height;
@@ -368,7 +423,9 @@ function init() {
     //   }
     // );
     hideCollapseFabButton();
-    updateWindowState(WINDOW_STATE_NONE);
+    updateWindowState(
+      isMobileViewport ? WINDOW_STATE_RESPONSIVE : WINDOW_STATE_NONE,
+    );
   };
   const fullscreen = () => {
     wrapper.style.width = `auto`;
@@ -402,7 +459,7 @@ function init() {
         type: "webhookAccessToken",
         payload: webhookAccessToken,
       },
-      "*"
+      "*",
     );
   };
   const setConversationUuid = (conversationUuid) => {
@@ -414,7 +471,23 @@ function init() {
         type: "conversationUuid",
         payload: conversationUuid,
       },
-      "*"
+      "*",
+    );
+  };
+  const setMcpAccessToken = (serverName, token) => {
+    if (token === null) delete agentState.mcpAccessTokens[serverName];
+    else agentState.mcpAccessTokens[serverName] = token;
+    if (!agentState.rendered) return;
+    setMcpAccessTokens(agentState.mcpAccessTokens);
+  };
+  const setMcpAccessTokens = (mcpAccessTokens) => {
+    iframe.contentWindow.postMessage(
+      {
+        source: "nventr-agent",
+        type: "mcpAccessTokens",
+        payload: mcpAccessTokens,
+      },
+      "*",
     );
   };
   const setMetadata = (metadata) => {
@@ -426,7 +499,19 @@ function init() {
         type: "metadata",
         payload: metadata,
       },
-      "*"
+      "*",
+    );
+  };
+  const setContext = (context) => {
+    agentState.context = context;
+    if (!agentState.rendered) return;
+    iframe.contentWindow.postMessage(
+      {
+        source: "nventr-agent",
+        type: "context",
+        payload: context,
+      },
+      "*",
     );
   };
   const updateWindowState = (windowState) => {
@@ -437,7 +522,7 @@ function init() {
         type: "windowState",
         payload: windowState,
       },
-      "*"
+      "*",
     );
   };
   const handleCollapseButtonClick = () => {
@@ -478,9 +563,9 @@ function init() {
       ],
       {
         duration: 300,
-        easing: "cubic-bezier(0.2, 0, 0, 1)", // Material easing
+        easing: "ease-in", // Material easing
         fill: "forwards",
-      }
+      },
     );
   };
   const fadeIn = ({ options = {} }) => {
@@ -493,6 +578,7 @@ function init() {
   };
   const show = () => {
     if (agentState.visible) return;
+    wrapper.style.visibility = "visible";
     wrapper.animate([{ opacity: 0 }, { opacity: 1 }], {
       duration: 800,
       easing: "linear",
@@ -502,11 +588,14 @@ function init() {
   };
   const hide = () => {
     if (!agentState.visible) return;
-    wrapper.animate([{ opacity: 1 }, { opacity: 0 }], {
+    const animation = wrapper.animate([{ opacity: 1 }, { opacity: 0 }], {
       duration: 800,
       easing: "linear",
       fill: "forwards",
     });
+    animation.onfinish = () => {
+      if (!agentState.visible) wrapper.style.visibility = "hidden";
+    };
     agentState.visible = false;
   };
   const remove = () => {
@@ -523,6 +612,7 @@ function init() {
       height: `${agentState.height}px`,
       width: `${agentState.width}px`,
       "z-index": agentState.zIndex,
+      visibility: "visible",
     });
     switch (agentState.windowState) {
       case WINDOW_STATE_COLLAPSED:
@@ -534,6 +624,7 @@ function init() {
       default:
       // do nothing
     }
+    handleResponsive();
     show();
   };
   const getOptionsByUrl = () => {
@@ -564,7 +655,7 @@ function init() {
     return {
       id: parseParamValue("id", null),
       dev: parseParamValue("dev", false),
-      uat: parseParamValue("uat", false),
+      legacy: parseParamValue("legacy", false),
       fullscreen: parseParamValue("fullscreen", false),
       collapse: parseParamValue("collapse", false),
       render: parseParamValue("render", true),
@@ -578,12 +669,12 @@ function init() {
   const render = (options = {}) => {
     // Parse the script source to get the query params using id nventr-agent
     const dev = options.dev || false;
-    const uat = options.uat || false;
+    const legacy = options.legacy || false;
 
     const agentAccessKey = options.id || options.agentAccessKey;
     if (!agentAccessKey) {
       console.warn(
-        "Nventr Agent warning. No agent access key provided. Please add the id parameter or use nventrAgent.render({ id: [AGENT ACCESS KEY] })."
+        "Nventr Agent warning. No agent access key provided. Please add the id parameter or use nventrAgent.render({ id: [AGENT ACCESS KEY] }).",
       );
       return false;
     }
@@ -594,6 +685,7 @@ function init() {
     if (options.webhookAccessToken)
       agentState.webhookAccessToken = options.webhookAccessToken;
     if (options.metadata) agentState.metadata = options.metadata;
+    if (options.context) agentState.context = options.context;
     if (options.onAction) agentState.onAction = options.onAction;
     if (options.onActions) agentState.onActions = options.onActions;
     if (options.margin) agentState.margin = options.margin;
@@ -603,12 +695,17 @@ function init() {
     if (options.zIndex) agentState.zIndex = options.zIndex;
     if (options.conversationUuid)
       agentState.conversationUuid = options.conversationUuid;
+    if (options.collapse === true)
+      agentState.windowState = WINDOW_STATE_COLLAPSED;
+    else if (options.fullscreen === true)
+      agentState.windowState = WINDOW_STATE_FULLSCREEN;
 
     // Create the wrapper
     // Make the wrapper id unique
     wrapper.id = `nventrAgentWrapper_${Date.now()}`;
     addStyles(wrapper, {
       ...styles.wrapper,
+      visibility: "hidden",
       bottom: `${agentState.margin}px`,
       right: `${agentState.margin}px`,
       borderRadius: `${agentState.radius}px`,
@@ -621,12 +718,13 @@ function init() {
       width: `${agentState.width - 64}px`,
     });
     handle.onmousedown = handleMouseDown;
-    // Create the collapse button
-    addStyles(collapseButton, styles.collapseButton);
-    collapseButton.onclick = handleCollapseButtonClick;
+
     // Create the fullscreen button
     addStyles(fullscreenButton, styles.fullscreenButton);
     fullscreenButton.onclick = handleFullscreenButtonClick;
+    // Create the collapse button
+    addStyles(collapseButton, styles.collapseButton);
+    collapseButton.onclick = handleCollapseButtonClick;
     // Create the fab button
     addStyles(fabButton, {
       ...styles.fabButton,
@@ -638,7 +736,7 @@ function init() {
       ...styles.iframe,
       borderRadius: `${agentState.radius}px`,
     });
-    const iframeQueryParams = [];
+    const iframeQueryParams = [`windowState=${agentState.windowState}`];
     if (options.theme) iframeQueryParams.push(`theme=${options.theme}`);
     if (options.radius) iframeQueryParams.push(`radius=${options.radius}`);
     if (options.conversationUuid)
@@ -646,11 +744,11 @@ function init() {
     const iframeQueryStr = iframeQueryParams.length
       ? `&${iframeQueryParams.join("&")}`
       : "";
-    let iframeSrc = `https://agent.inventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`;
-    if (uat)
-      iframeSrc = `https://uat-agent.inventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`;
-    else if (dev)
-      iframeSrc = `https://dev-agent.inventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`;
+    let iframeSrc = `https://agent.app.nventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`;
+    if (dev)
+      iframeSrc = `https://dev.agent.app.nventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`;
+    else if (legacy)
+      iframeSrc = `https://agent.inventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`;
     iframe.src = iframeSrc;
     iframe.allow = "microphone";
     iframe.allowusermedia = "true";
@@ -660,11 +758,6 @@ function init() {
     wrapper.appendChild(fullscreenButton);
     wrapper.appendChild(fabButton);
     document.body.appendChild(wrapper);
-
-    if (options.collapse === true)
-      agentState.windowState = WINDOW_STATE_COLLAPSED;
-    else if (options.fullscreen === true)
-      agentState.windowState = WINDOW_STATE_FULLSCREEN;
     return true;
   };
   const styles = {
@@ -689,7 +782,7 @@ function init() {
       cursor: "pointer",
       position: "absolute",
       top: "0px",
-      right: "32px",
+      right: "0px",
       height: "32px",
       width: "32px",
       opacity: "0",
@@ -708,7 +801,7 @@ function init() {
       cursor: "pointer",
       position: "absolute",
       top: "0px",
-      right: "0px",
+      right: "32px",
       height: "32px",
       width: "32px",
       opacity: "0",
@@ -738,6 +831,9 @@ function init() {
     setWebhookAccessToken: (webhookAccessToken) =>
       setWebhookAccessToken(webhookAccessToken),
     removeWebhookAccessToken: () => setWebhookAccessToken(null),
+    setMcpAccessToken: (serverName, token) =>
+      setMcpAccessToken(serverName, token),
+    removeMcpAccessToken: (serverName) => setMcpAccessToken(serverName, null),
     setConversationUuid: (conversationUuid) =>
       setConversationUuid(conversationUuid),
     removeConversationUuid: () => setConversationUuid(null),
@@ -788,6 +884,8 @@ function init() {
     theme: (theme) => {
       agentState.theme = theme;
     },
+    setContext: (context) => setContext(context),
+    clearContext: () => setContext(null),
     remove: () => remove(),
   };
 }
