@@ -892,4 +892,3 @@ function init() {
 const nventrAgent = window.nventrAgent || init();
 window.nventrAgent = nventrAgent;
 window.inventrAgent = nventrAgent;
-export default nventrAgent;
