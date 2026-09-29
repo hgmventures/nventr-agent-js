@@ -219,6 +219,79 @@ window.nventrAgent.setWebhookAccessToken(exampleWebhookAccessToken);
 
 - **token**: The action access token, secure token (JWT or other) that can be used to validate action requests.
 
+### setMcpCode(serverName, code)
+
+Gives the agent a one-time **authorization code** for one of its MCP servers. Use this for MCP servers whose auth type is **OAuth Code** in the agent settings. The agent exchanges the code for its own access token at that server's **Token URL**. Your page never handles an access token.
+
+Your backend issues the code for the signed-in user. Give it to the agent once after sign-in, and again whenever `onMcpCodeRequired` asks for one. A code works only once, so the library sends each code to the agent a single time and never re-sends it. If you call `setMcpCode` before the agent has rendered, the code is held and sent as soon as it's ready. A newer code for the same server replaces one that is still waiting.
+
+#### Example Usage
+
+```javascript
+// codeFromYourServer: a fresh one-time code for the signed-in user
+window.nventrAgent.setMcpCode("my-mcp-server", codeFromYourServer);
+```
+
+#### Parameters
+
+- **serverName**: The `name` of the MCP server in the agent's settings.
+- **code**: A single-use authorization code, issued by your server for the signed-in user. Keep it short-lived; a few minutes is typical.
+
+### removeMcpCode(serverName)
+
+Drops a code that hasn't been sent to the agent yet. Call it when the user signs out.
+
+```javascript
+window.nventrAgent.removeMcpCode("my-mcp-server");
+```
+
+### onMcpCodeRequired(callback)
+
+Called when the agent needs a new code for an MCP server. For example, the agent has just connected and doesn't have a grant yet, the grant was revoked, or renewing it failed. Get a fresh code from your server and pass it to `setMcpCode`.
+
+```javascript
+window.nventrAgent.onMcpCodeRequired(async (serverName, reason) => {
+  // reason: "missing" | "expired" | "revoked" | "error"
+  const code = await fetchNewMcpCode(); // your backend
+  window.nventrAgent.setMcpCode(serverName, code);
+});
+```
+
+#### Parameters
+
+- **callback(serverName, reason)**: `serverName` is the MCP server that needs a code, and `reason` says why. Passing `null` removes the callback.
+
+### MCP servers with OAuth Code auth
+
+To have the agent call your MCP server as the signed-in user:
+
+1. In the agent's settings, add an MCP server with auth type **OAuth Code**. Set its **Token URL** to your OAuth 2.0 token endpoint.
+2. Your backend issues a one-time authorization code for the signed-in user, and your page passes it in with `setMcpCode`.
+3. The agent exchanges the code at your Token URL using the OAuth 2.0 authorization code grant ([RFC 6749 §4.1.3](https://www.rfc-editor.org/rfc/rfc6749#section-4.1.3)):
+
+   ```
+   POST {tokenUrl}
+
+   grant_type=authorization_code
+   code=<the code>
+   ```
+
+   Your endpoint answers with a standard token response:
+
+   ```json
+   { "access_token": "…", "token_type": "Bearer", "expires_in": 900 }
+   ```
+
+   Or, when the code is bad, used or expired:
+
+   ```json
+   { "error": "invalid_grant" }
+   ```
+
+4. The agent calls your MCP server with `Authorization: Bearer <access_token>`. It keeps the grant for the whole connection, across conversations, and renews it itself. When it can't renew, it asks your page for a new code through `onMcpCodeRequired`.
+
+Treat codes like passwords. Issue them only to the signed-in user, make each one single-use, and let them expire after a few minutes.
+
 ### addActionListener(actionName, callback)
 
 Registers a callback function for a specific action. The callback is executed when the specified action is received.

@@ -1,13 +1,21 @@
 {
   "name": "@nventr.ai/nventr-agent",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "description": "Core javascript for including nventr-agent in a web application.",
   "main": "dist/nventr-agent.module.js",
+  "module": "dist/nventr-agent.esm.mjs",
+  "exports": {
+    ".": {
+      "import": "./dist/nventr-agent.esm.mjs",
+      "require": "./dist/nventr-agent.module.js"
+    }
+  },
   "scripts": {
     "build:browser": "uglifyjs src/nventr-agent.js --compress --mangle --warn --output dist/nventr-agent.js",
     "build:module": "uglifyjs src/nventr-agent.js --compress --mangle --warn --output dist/nventr-agent.module.js && printf '\\nmodule.exports=window.nventrAgent;' >> dist/nventr-agent.module.js",
-    "build": "npm run build:browser && npm run build:module",
-    "dev": "cp src/nventr-agent.js dist/nventr-agent.js && nodemon --watch src/nventr-agent.js --exec 'cp src/nventr-agent.js dist/nventr-agent.js'"
+    "build": "npm run build:browser && npm run build:module && npm run build:esm",
+    "dev": "cp src/nventr-agent.js dist/nventr-agent.js && nodemon --watch src/nventr-agent.js --exec 'cp src/nventr-agent.js dist/nventr-agent.js'",
+    "build:esm": "uglifyjs src/nventr-agent.js --compress --mangle --warn --output dist/nventr-agent.esm.mjs && printf '\\nexport default window.nventrAgent;' >> dist/nventr-agent.esm.mjs"
   },
   "repository": {
     "type": "git",

@@ -99,6 +99,12 @@ function init() {
     onActions: null,
     webhookAccessToken: null,
     mcpAccessTokens: {},
+    // Single-use MCP codes waiting for the iframe. Sent once, never re-synced.
+    mcpCodes: [],
+    onMcpCodeRequired: null,
+    // Origin of the agent iframe. Messages go only there and are accepted
+    // only from there.
+    agentOrigin: null,
     metadata: null,
     context: null,
     height: 448,
@@ -111,6 +117,8 @@ function init() {
   };
   window.addEventListener("message", function (event) {
     if (!event || !event.data || event.data.source !== "nventr-agent") return;
+    if (!agentState.agentOrigin || event.origin !== agentState.agentOrigin)
+      return;
     const parseAction = (action) => ({
       name: action.name,
       value: action.value ? JSON.parse(action.value) : null,
@@ -141,6 +149,16 @@ function init() {
         });
         break;
       case "onBeforeNewConversation":
+        break;
+      case "mcpCodeRequired":
+        // The agent has no working grant for this server: the host should
+        // get a fresh code and call setMcpCode.
+        if (event.data.payload && event.data.payload.serverName)
+          agentState.onMcpCodeRequired &&
+            agentState.onMcpCodeRequired(
+              event.data.payload.serverName,
+              event.data.payload.reason || null,
+            );
         break;
       case "rendered":
         // Iframe reloaded (e.g. user picked "New Conversation"): re-sync
@@ -174,6 +192,7 @@ function init() {
           setWebhookAccessToken(agentState.webhookAccessToken);
         Object.keys(agentState.mcpAccessTokens).length > 0 &&
           setMcpAccessTokens(agentState.mcpAccessTokens);
+        sendMcpCodes();
         agentState.metadata && setMetadata(agentState.metadata);
         agentState.context && setContext(agentState.context);
         finalizeRender();
@@ -450,29 +469,24 @@ function init() {
   const hideCollapseFabButton = () => {
     fabButton.style.display = "none";
   };
+  // Target the agent's origin, never "*": anything else loaded in the frame
+  // would receive tokens and codes.
+  const postToAgent = (type, payload) => {
+    if (!agentState.agentOrigin || !iframe.contentWindow) return;
+    iframe.contentWindow.postMessage(
+      { source: "nventr-agent", type, payload },
+      agentState.agentOrigin,
+    );
+  };
   const setWebhookAccessToken = (webhookAccessToken) => {
     agentState.webhookAccessToken = webhookAccessToken;
     if (!agentState.rendered) return;
-    iframe.contentWindow.postMessage(
-      {
-        source: "nventr-agent",
-        type: "webhookAccessToken",
-        payload: webhookAccessToken,
-      },
-      "*",
-    );
+    postToAgent("webhookAccessToken", webhookAccessToken);
   };
   const setConversationUuid = (conversationUuid) => {
     agentState.setConversationUuid = conversationUuid;
     if (!agentState.rendered) return;
-    iframe.contentWindow.postMessage(
-      {
-        source: "nventr-agent",
-        type: "conversationUuid",
-        payload: conversationUuid,
-      },
-      "*",
-    );
+    postToAgent("conversationUuid", conversationUuid);
   };
   const setMcpAccessToken = (serverName, token) => {
     if (token === null) delete agentState.mcpAccessTokens[serverName];
@@ -480,50 +494,40 @@ function init() {
     if (!agentState.rendered) return;
     setMcpAccessTokens(agentState.mcpAccessTokens);
   };
-  const setMcpAccessTokens = (mcpAccessTokens) => {
-    iframe.contentWindow.postMessage(
-      {
-        source: "nventr-agent",
-        type: "mcpAccessTokens",
-        payload: mcpAccessTokens,
-      },
-      "*",
+  // Single-use code for an MCP server with auth type CODE; the agent
+  // exchanges it at that server's Token URL. Sent once -- a used code is
+  // worthless, so it's never re-synced like the runtime tokens are.
+  const setMcpCode = (serverName, code) => {
+    if (!serverName) return;
+    // A newer code (or a removal) replaces one still waiting to be sent.
+    agentState.mcpCodes = agentState.mcpCodes.filter(
+      (item) => item.serverName !== serverName,
     );
+    if (!code) return;
+    agentState.mcpCodes.push({ serverName, code });
+    if (agentState.rendered) sendMcpCodes();
+  };
+  const sendMcpCodes = () => {
+    const codes = agentState.mcpCodes;
+    agentState.mcpCodes = [];
+    codes.forEach((payload) => postToAgent("mcpCode", payload));
+  };
+  const setMcpAccessTokens = (mcpAccessTokens) => {
+    postToAgent("mcpAccessTokens", mcpAccessTokens);
   };
   const setMetadata = (metadata) => {
     agentState.metadata = metadata;
     if (!agentState.rendered) return;
-    iframe.contentWindow.postMessage(
-      {
-        source: "nventr-agent",
-        type: "metadata",
-        payload: metadata,
-      },
-      "*",
-    );
+    postToAgent("metadata", metadata);
   };
   const setContext = (context) => {
     agentState.context = context;
     if (!agentState.rendered) return;
-    iframe.contentWindow.postMessage(
-      {
-        source: "nventr-agent",
-        type: "context",
-        payload: context,
-      },
-      "*",
-    );
+    postToAgent("context", context);
   };
   const updateWindowState = (windowState) => {
     agentState.windowState = windowState;
-    iframe.contentWindow.postMessage(
-      {
-        source: "nventr-agent",
-        type: "windowState",
-        payload: windowState,
-      },
-      "*",
-    );
+    postToAgent("windowState", windowState);
   };
   const handleCollapseButtonClick = () => {
     agentState.windowState =
@@ -750,6 +754,7 @@ function init() {
     else if (legacy)
       iframeSrc = `https://agent.inventr.ai?agentAccessKey=${agentAccessKey}${iframeQueryStr}`;
     iframe.src = iframeSrc;
+    agentState.agentOrigin = new URL(iframeSrc).origin;
     iframe.allow = "microphone";
     iframe.allowusermedia = "true";
     wrapper.appendChild(iframe);
@@ -834,6 +839,12 @@ function init() {
     setMcpAccessToken: (serverName, token) =>
       setMcpAccessToken(serverName, token),
     removeMcpAccessToken: (serverName) => setMcpAccessToken(serverName, null),
+    setMcpCode: (serverName, code) => setMcpCode(serverName, code),
+    removeMcpCode: (serverName) => setMcpCode(serverName, null),
+    // callback(serverName, reason): the agent needs a fresh code.
+    onMcpCodeRequired: (callback) => {
+      agentState.onMcpCodeRequired = callback || null;
+    },
     setConversationUuid: (conversationUuid) =>
       setConversationUuid(conversationUuid),
     removeConversationUuid: () => setConversationUuid(null),
