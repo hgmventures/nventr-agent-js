@@ -35,6 +35,19 @@
  * fullscreen: Function
  * This function is used to make the chatbot go into fullscreen mode.
  *
+ * sidebar: Function
+ * This function docks the chatbot as a full-height sidebar (sidebarPosition: "LEFT" | "RIGHT",
+ * sidebarWidth in px, sidebarTop: px or a selector of the header to sit under). The sidebar header button is shown only when the sidebar option is true.
+ *
+ * onWindowStateChange: Function
+ * onWindowStateChange(callback) calls back with the current window state right away, then on every change:
+ * { windowState, previousWindowState, collapsedType, position, width, top }
+ * windowState is NONE | RESPONSIVE | COLLAPSED | FULLSCREEN | SIDEBAR. position and width describe the
+ * sidebar (null when the window is not a sidebar). Returns { remove }.
+ *
+ * getWindowState: Function
+ * Returns the current window state.
+ *
  * remove: Function
  * This function is used to remove the chatbot interface from the document.
  *
@@ -59,6 +72,7 @@ function init() {
   const handle = document.createElement("div");
   const collapseButton = document.createElement("div");
   const fullscreenButton = document.createElement("div");
+  const sidebarButton = document.createElement("div");
   const fabButton = document.createElement("div");
   const iframe = document.createElement("iframe");
   const dragContainer = document;
@@ -91,6 +105,7 @@ function init() {
     },
   };
   const actionListeners = [];
+  const windowStateListeners = [];
   const agentState = {
     visible: false,
     rendered: false,
@@ -114,7 +129,17 @@ function init() {
     zIndex: 10,
     windowState: WINDOW_STATE_NONE,
     collapsedType: COLLAPSED_TYPE_FAB,
+    // Docked sidebar. `sidebar` shows the header button for it.
+    sidebar: false,
+    sidebarPosition: SIDEBAR_POSITION_RIGHT,
+    sidebarWidth: 380,
+    // Where the sidebar starts: px, or a selector of the header to sit under.
+    sidebarTop: 0,
+    // Width last reported to the page (--nventr-agent-sidebar-width).
+    reservedWidth: 0,
   };
+  // Below this viewport width a sidebar would just be fullscreen.
+  const SIDEBAR_MIN_VIEWPORT_WIDTH = 640;
   window.addEventListener("message", function (event) {
     if (!event || !event.data || event.data.source !== "nventr-agent") return;
     if (!agentState.agentOrigin || event.origin !== agentState.agentOrigin)
@@ -210,6 +235,9 @@ function init() {
       return;
     agentState.windowWidth = width;
     agentState.windowHeight = height;
+    // A sidebar under a header follows the header's height.
+    if (agentState.windowState === WINDOW_STATE_SIDEBAR)
+      wrapper.style.top = `${getSidebarTop()}px`;
     // If it is a standard window, call restore to make sure it fits in the viewport
     if (
       [WINDOW_STATE_NONE, WINDOW_STATE_RESPONSIVE].includes(
@@ -233,9 +261,11 @@ function init() {
   const handleMouseDown = (e) => {
     // Do not allow dragging in fullscreen or when collapsed to FAB
     if (
-      [WINDOW_STATE_FULLSCREEN, WINDOW_STATE_RESPONSIVE].includes(
-        agentState.windowState,
-      )
+      [
+        WINDOW_STATE_FULLSCREEN,
+        WINDOW_STATE_RESPONSIVE,
+        WINDOW_STATE_SIDEBAR,
+      ].includes(agentState.windowState)
     )
       return;
     if (
@@ -304,6 +334,35 @@ function init() {
   };
   const defaultBoxShadow =
     "0px 1.5px 5px 0px rgba(0,0,0,0.06), 0px 3px 14px 2px rgba(0,0,0,0.05), 0px 8px 10px 1px rgba(0,0,0,0.08)";
+  const setRadius = (radius) => {
+    wrapper.style.borderRadius = `${radius}px`;
+    iframe.style.borderRadius = `${radius}px`;
+  };
+  const getSidebarTop = () => {
+    const top = agentState.sidebarTop;
+    if (typeof top === "number") return top;
+    const element = top ? document.querySelector(top) : null;
+    return element
+      ? Math.max(0, Math.round(element.getBoundingClientRect().bottom))
+      : 0;
+  };
+  const sidebar = () => {
+    // A sidebar on a narrow viewport is just fullscreen.
+    if (window.innerWidth <= SIDEBAR_MIN_VIEWPORT_WIDTH) return fullscreen();
+    const left = agentState.sidebarPosition === SIDEBAR_POSITION_LEFT;
+    addStyles(wrapper, {
+      top: `${getSidebarTop()}px`,
+      bottom: "0px",
+      left: left ? "0px" : null,
+      right: left ? null : "0px",
+      height: "auto",
+      width: `${agentState.sidebarWidth}px`,
+      boxShadow: defaultBoxShadow,
+    });
+    setRadius(0);
+    hideCollapseFabButton();
+    updateWindowState(WINDOW_STATE_SIDEBAR);
+  };
   const collapse = () => {
     const collapedLayout = layout.collapsed[agentState.collapsedType];
     motionFadeIn();
@@ -333,6 +392,11 @@ function init() {
     addStyles(wrapper, {
       boxShadow: defaultBoxShadow,
     });
+    setRadius(
+      agentState.collapsedType === COLLAPSED_TYPE_FAB
+        ? collapedLayout.borderRadius
+        : agentState.radius,
+    );
     updateWindowState(WINDOW_STATE_COLLAPSED);
   };
   const restore = (options = {}) => {
@@ -429,6 +493,7 @@ function init() {
       width: `${width}px`,
       boxShadow: defaultBoxShadow,
     });
+    setRadius(agentState.radius);
     if (resetPosition) motionFadeIn();
     // wrapper.animate(
     //   [
@@ -459,6 +524,7 @@ function init() {
     // wrapper.style.borderRadius = "0px";
     // iframe.style.borderRadius = "0px";
     hideCollapseFabButton();
+    setRadius(agentState.radius);
     updateWindowState(WINDOW_STATE_FULLSCREEN);
   };
   const showCollapseFabButton = () => {
@@ -525,40 +591,47 @@ function init() {
     if (!agentState.rendered) return;
     postToAgent("context", context);
   };
+  const getWindowStatePayload = (previousWindowState = null) => {
+    const isSidebar = agentState.windowState === WINDOW_STATE_SIDEBAR;
+    return {
+      windowState: agentState.windowState,
+      previousWindowState,
+      collapsedType: agentState.collapsedType,
+      position: isSidebar ? agentState.sidebarPosition : null,
+      width: isSidebar ? agentState.sidebarWidth : 0,
+      top: isSidebar ? getSidebarTop() : 0,
+    };
+  };
+  const notifyWindowState = (previousWindowState) => {
+    const payload = getWindowStatePayload(previousWindowState);
+    // Hosts can pad their layout with this: padding-right: var(--nventr-agent-sidebar-width)
+    document.documentElement.style.setProperty(
+      "--nventr-agent-sidebar-width",
+      `${payload.width}px`,
+    );
+    windowStateListeners.slice().forEach((callback) => callback(payload));
+    // Hosts that lay out by the available width (e.g. R14) re-measure.
+    if (payload.width !== agentState.reservedWidth) {
+      agentState.reservedWidth = payload.width;
+      window.dispatchEvent(new Event("resize"));
+    }
+  };
   const updateWindowState = (windowState) => {
+    const previousWindowState = agentState.windowState;
     agentState.windowState = windowState;
     postToAgent("windowState", windowState);
+    if (windowState !== previousWindowState)
+      notifyWindowState(previousWindowState);
   };
-  const handleCollapseButtonClick = () => {
-    agentState.windowState =
-      agentState.windowState === WINDOW_STATE_COLLAPSED
-        ? WINDOW_STATE_NONE
-        : WINDOW_STATE_COLLAPSED;
-
-    switch (agentState.windowState) {
-      case WINDOW_STATE_COLLAPSED:
-        collapse();
-        break;
-      default:
-        restore();
-        break;
-    }
-  };
-  const handleFullscreenButtonClick = () => {
-    agentState.windowState =
-      agentState.windowState === WINDOW_STATE_FULLSCREEN
-        ? WINDOW_STATE_NONE
-        : WINDOW_STATE_FULLSCREEN;
-
-    switch (agentState.windowState) {
-      case WINDOW_STATE_FULLSCREEN:
-        fullscreen();
-        break;
-      default:
-        restore();
-        break;
-    }
-  };
+  // Header buttons toggle their own state; anything else goes back to the window.
+  const toggleWindowState = (windowState, apply) =>
+    agentState.windowState === windowState ? restore() : apply();
+  const handleCollapseButtonClick = () =>
+    toggleWindowState(WINDOW_STATE_COLLAPSED, collapse);
+  const handleFullscreenButtonClick = () =>
+    toggleWindowState(WINDOW_STATE_FULLSCREEN, fullscreen);
+  const handleSidebarButtonClick = () =>
+    toggleWindowState(WINDOW_STATE_SIDEBAR, sidebar);
   const motionFadeIn = ({ duration = 800 } = {}) => {
     wrapper.animate(
       [
@@ -625,11 +698,16 @@ function init() {
       case WINDOW_STATE_FULLSCREEN:
         fullscreen();
         break;
+      case WINDOW_STATE_SIDEBAR:
+        sidebar();
+        break;
       default:
       // do nothing
     }
     handleResponsive();
     show();
+    // The first state, for listeners added before the render.
+    notifyWindowState(null);
   };
   const getOptionsByUrl = () => {
     const script = document.getElementById("nventr-agent");
@@ -662,6 +740,10 @@ function init() {
       legacy: parseParamValue("legacy", false),
       fullscreen: parseParamValue("fullscreen", false),
       collapse: parseParamValue("collapse", false),
+      sidebar: parseParamValue("sidebar", false),
+      sidebarPosition: parseParamValue("sidebarPosition", null),
+      sidebarWidth: parseParamValue("sidebarWidth", null),
+      sidebarTop: parseParamValue("sidebarTop", null),
       render: parseParamValue("render", true),
       margin: parseParamValue("margin", null),
       zIndex: parseParamValue("zIndex", null),
@@ -699,7 +781,21 @@ function init() {
     if (options.zIndex) agentState.zIndex = options.zIndex;
     if (options.conversationUuid)
       agentState.conversationUuid = options.conversationUuid;
-    if (options.collapse === true)
+    agentState.sidebar = options.sidebar === true;
+    if (options.sidebarPosition)
+      agentState.sidebarPosition =
+        String(options.sidebarPosition).toUpperCase() === SIDEBAR_POSITION_LEFT
+          ? SIDEBAR_POSITION_LEFT
+          : SIDEBAR_POSITION_RIGHT;
+    if (options.sidebarTop !== undefined && options.sidebarTop !== null)
+      agentState.sidebarTop = isNaN(options.sidebarTop)
+        ? String(options.sidebarTop)
+        : parseInt(options.sidebarTop);
+    if (options.sidebarWidth && !isNaN(options.sidebarWidth))
+      agentState.sidebarWidth = parseInt(options.sidebarWidth);
+    if (options.windowState === WINDOW_STATE_SIDEBAR && agentState.sidebar)
+      agentState.windowState = WINDOW_STATE_SIDEBAR;
+    else if (options.collapse === true)
       agentState.windowState = WINDOW_STATE_COLLAPSED;
     else if (options.fullscreen === true)
       agentState.windowState = WINDOW_STATE_FULLSCREEN;
@@ -726,6 +822,9 @@ function init() {
     // Create the fullscreen button
     addStyles(fullscreenButton, styles.fullscreenButton);
     fullscreenButton.onclick = handleFullscreenButtonClick;
+    // Create the sidebar button (only when the host enables the sidebar)
+    addStyles(sidebarButton, styles.sidebarButton);
+    sidebarButton.onclick = handleSidebarButtonClick;
     // Create the collapse button
     addStyles(collapseButton, styles.collapseButton);
     collapseButton.onclick = handleCollapseButtonClick;
@@ -741,6 +840,7 @@ function init() {
       borderRadius: `${agentState.radius}px`,
     });
     const iframeQueryParams = [`windowState=${agentState.windowState}`];
+    if (agentState.sidebar) iframeQueryParams.push("sidebar=true");
     if (options.theme) iframeQueryParams.push(`theme=${options.theme}`);
     if (options.radius) iframeQueryParams.push(`radius=${options.radius}`);
     if (options.conversationUuid)
@@ -761,6 +861,7 @@ function init() {
     wrapper.appendChild(handle);
     wrapper.appendChild(collapseButton);
     wrapper.appendChild(fullscreenButton);
+    if (agentState.sidebar) wrapper.appendChild(sidebarButton);
     wrapper.appendChild(fabButton);
     document.body.appendChild(wrapper);
     return true;
@@ -800,6 +901,15 @@ function init() {
       right: "0px",
       bottom: "0px",
       left: "0px",
+      opacity: "0",
+    },
+    sidebarButton: {
+      cursor: "pointer",
+      position: "absolute",
+      top: "0px",
+      right: "64px",
+      height: "32px",
+      width: "32px",
       opacity: "0",
     },
     fullscreenButton: {
@@ -884,6 +994,20 @@ function init() {
     restore: () => restore(),
     collapse: () => collapse(),
     fullscreen: () => fullscreen(),
+    sidebar: () => sidebar(),
+    getWindowState: () => agentState.windowState,
+    // Calls back with the current state right away (once rendered), then on
+    // every change. Returns { remove }.
+    onWindowStateChange: (callback) => {
+      windowStateListeners.push(callback);
+      if (agentState.rendered) callback(getWindowStatePayload(null));
+      return {
+        remove: () => {
+          const index = windowStateListeners.indexOf(callback);
+          if (index !== -1) windowStateListeners.splice(index, 1);
+        },
+      };
+    },
     show: () => show(),
     hide: () => hide(),
     margin: (margin) => {
